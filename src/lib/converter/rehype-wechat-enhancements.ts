@@ -136,9 +136,12 @@ export const rehypeWechatEnhancements: Plugin<[], Root> = () => {
         }
 
         if (classNames.includes('math-display')) {
-          const formula = encodeURIComponent(codeText);
+          // 使用 PNG 格式而不是 SVG，微信兼容性更好
+          // 添加 dpi 和背景色参数提升显示效果
+          const params = '\\dpi{150}\\bg{white}';
+          const formula = encodeURIComponent(params + codeText);
           parent.children[index] = createParagraphWithImage(
-            `https://latex.codecogs.com/svg.image?${formula}`,
+            `https://latex.codecogs.com/png.image?${formula}`,
             `formula: ${codeText}`
           );
         }
@@ -149,9 +152,12 @@ export const rehypeWechatEnhancements: Plugin<[], Root> = () => {
         if (!classNames.includes('math-inline')) return;
 
         const formulaText = getText(node);
-        const formula = encodeURIComponent(formulaText);
+        // 使用 PNG 格式而不是 SVG，微信兼容性更好
+        // 添加 dpi 和背景色参数提升显示效果
+        const params = '\\dpi{150}\\bg{white}';
+        const formula = encodeURIComponent(params + formulaText);
         parent.children[index] = createImage(
-          `https://latex.codecogs.com/svg.image?${formula}`,
+          `https://latex.codecogs.com/png.image?${formula}`,
           `formula: ${formulaText}`
         );
       }

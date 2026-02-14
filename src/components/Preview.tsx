@@ -52,6 +52,7 @@ export function Preview() {
       <div className="flex-1 overflow-y-auto px-4 py-3">
         {html ? (
           <div
+            id="wechat-output"
             className="wechat-preview"
             dangerouslySetInnerHTML={{ __html: html }}
           />

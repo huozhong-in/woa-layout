@@ -64,11 +64,15 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
           if (child.tagName !== 'ul' && child.tagName !== 'ol') continue;
 
           const existingStyle = (child.properties?.style as string) || '';
-          const nestedListStyle = 'margin-left: 1.5em; list-style-position: outside';
-          child.properties = child.properties || {};
-          child.properties.style = existingStyle
-            ? `${existingStyle}; ${nestedListStyle}`
-            : nestedListStyle;
+          // 嵌套列表只需要设置左边距，不设置 list-style-position
+          // 微信编辑器对 inside 的支持有问题，会导致列表标记错位
+          // 2024-02-14: 已经在默认模板中添加了 pl-10 (padding-left: 40px)，这既解决了 marker 显示问题，也提供了自然的缩进
+          // 因此这里不需要额外的 margin-left，否则缩进会过大
+          // const nestedListStyle = 'margin-left: 1.5em';
+          // child.properties = child.properties || {};
+          // child.properties.style = existingStyle
+          //   ? `${existingStyle}; ${nestedListStyle}`
+          //   : nestedListStyle;
         }
       }
     });
