@@ -175,7 +175,7 @@ export default {
 #### 2. PRD.md (精简版)
 
 ```markdown
-# 项目：MP-Formatter (微信公众号 API 排版引擎)
+# 项目：WOA-Layout (微信公众号 API 排版引擎)
 
 ## 1. 产品定位
 一个基于 Bun + TS 的排版中间件，支持通过 TailwindCSS 定义 Markdown 标签的渲染样式，并输出微信公众号兼容的内联样式 HTML。

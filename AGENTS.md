@@ -1,10 +1,10 @@
 ---
-description: MP-Formatter 项目技术栈指南：使用 Bun + Hono + unified + SQLite
+description: WOA-Layout 项目技术栈指南：使用 Bun + Hono + unified + SQLite
 globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: true
 ---
 
-# MP-Formatter 项目技术栈
+# WOA-Layout 项目技术栈
 
 这是一个微信公众号 Markdown 排版工具，使用 Bun 作为运行时。
 

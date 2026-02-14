@@ -1,41 +1,32 @@
-import { serve } from "bun";
-import index from "./index.html";
+import { Hono } from 'hono';
+import { serveStatic } from 'hono/bun';
+import api from './api';
+import { getDatabase } from './lib/db';
+import index from './index.html';
 
-const server = serve({
-  routes: {
-    // Serve index.html for all unmatched routes.
-    "/*": index,
+// 初始化数据库
+await getDatabase();
 
-    "/api/hello": {
-      async GET(req) {
-        return Response.json({
-          message: "Hello, world!",
-          method: "GET",
-        });
-      },
-      async PUT(req) {
-        return Response.json({
-          message: "Hello, world!",
-          method: "PUT",
-        });
-      },
-    },
+const app = new Hono();
 
-    "/api/hello/:name": async req => {
-      const name = req.params.name;
-      return Response.json({
-        message: `Hello, ${name}!`,
-      });
-    },
-  },
+// 挂载 API 路由
+app.route('/api', api);
 
-  development: process.env.NODE_ENV !== "production" && {
-    // Enable browser hot reloading in development
-    hmr: true,
+// 静态文件服务
+app.use('/assets/*', serveStatic({ root: './' }));
 
-    // Echo console logs from the browser to the server
-    console: true,
-  },
+// 前端路由（返回 index.html）
+app.get('/*', (c) => {
+  return c.html(index);
 });
 
-console.log(`🚀 Server running at ${server.url}`);
+// 启动服务器
+export default {
+  port: 3000,
+  fetch: app.fetch,
+};
+
+console.log(`🚀 WOA-Layout 服务器启动成功！`);
+console.log(`📍 访问地址: http://localhost:3000`);
+console.log(`📍 API 地址: http://localhost:3000/api`);
+
