@@ -3,9 +3,12 @@
 
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import remarkRehype from 'remark-rehype';
 import rehypeStringify from 'rehype-stringify';
 import { rehypeInjectStyles } from './rehype-inject-styles';
+import { rehypeWechatEnhancements } from './rehype-wechat-enhancements';
 import type { TemplateConfig } from '../db/types';
 
 export interface ConversionResult {
@@ -25,7 +28,10 @@ export async function convertMarkdownToHTML(
   try {
     const processor = unified()
       .use(remarkParse) // Markdown → MDAST
+      .use(remarkGfm) // GFM 扩展（表格、删除线等）
+      .use(remarkMath) // 公式语法支持
       .use(remarkRehype) // MDAST → HAST
+      .use(rehypeWechatEnhancements) // Mermaid/LaTeX 图片化 + 文末链接引用
       .use(rehypeInjectStyles, templateConfig) // 注入内联样式
       .use(rehypeStringify); // HAST → HTML
 

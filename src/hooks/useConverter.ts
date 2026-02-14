@@ -5,16 +5,11 @@ import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../store';
 
 export function useConverter() {
-  const {
-    markdown,
-    currentTemplate,
-    tempConfig,
-    setHtml,
-    setWarnings,
-    setIsConverting,
-  } = useAppStore();
+  const { setHtml, setWarnings, setIsConverting } = useAppStore();
 
   const convert = useCallback(async () => {
+    const { markdown, currentTemplate, tempConfig } = useAppStore.getState();
+
     if (!currentTemplate) return;
 
     setIsConverting(true);
@@ -40,7 +35,11 @@ export function useConverter() {
         setWarnings(data.warnings || []);
       } else {
         console.error('Conversion failed:', data.error);
-        setWarnings([data.error || '转换失败']);
+        const errorMessage =
+          typeof data.error === 'string'
+            ? data.error
+            : data.error?.message || '转换失败';
+        setWarnings([errorMessage]);
       }
     } catch (error) {
       console.error('Conversion error:', error);
@@ -48,7 +47,7 @@ export function useConverter() {
     } finally {
       setIsConverting(false);
     }
-  }, [markdown, currentTemplate, tempConfig, setHtml, setWarnings, setIsConverting]);
+  }, [setHtml, setWarnings, setIsConverting]);
 
   return { convert };
 }

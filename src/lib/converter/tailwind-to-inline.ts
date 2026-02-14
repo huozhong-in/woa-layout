@@ -2,8 +2,9 @@
 // TailwindCSS 类名转内联样式转换器
 
 import postcss from 'postcss';
-import tailwindcss from 'tailwindcss';
-import { parse as parseCSS } from 'css';
+import tailwindcss from '@tailwindcss/postcss';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
 
 // 微信不支持的 CSS 属性黑名单
 const WECHAT_UNSUPPORTED_PROPERTIES = [
@@ -49,11 +50,8 @@ export async function convertTailwindToInline(
   // 2. 移除不支持的前缀（hover:, before: 等）
   const cleanedClasses = removeUnsupportedPrefixes(processedClasses);
 
-  // 3. 构造虚拟 HTML
-  const html = buildVirtualHTML(tagName, cleanedClasses);
-
   // 4. 通过 PostCSS + Tailwind 生成 CSS
-  const css = await generateCSS(html);
+  const css = await generateCSS(cleanedClasses);
 
   // 5. 解析 CSS 并提取样式
   const classList = cleanedClasses.split(/\s+/).filter(Boolean);
@@ -105,27 +103,21 @@ function removeUnsupportedPrefixes(classes: string): string {
 }
 
 /**
- * 构造虚拟 HTML 片段
- */
-function buildVirtualHTML(tagName: string, classes: string): string {
-  return `<${tagName} class="${classes}">content</${tagName}>`;
-}
-
-/**
  * 使用 PostCSS + Tailwind 生成 CSS
  */
-async function generateCSS(html: string): Promise<string> {
-  const tailwindConfig = {
-    content: [{ raw: html, extension: 'html' }],
-    corePlugins: {
-      preflight: false, // 禁用基础样式重置
-    },
-  };
+async function generateCSS(classes: string): Promise<string> {
+  const projectRoot = fileURLToPath(new URL('../../../', import.meta.url));
+  const inlineSource = classes.replace(/"/g, '\\"');
+  const input = `
+@import "tailwindcss" source(none);
+@source inline("${inlineSource}");
+@tailwind utilities;
+`;
 
   try {
     const result = await postcss([
-      tailwindcss(tailwindConfig)
-    ]).process('@tailwind utilities;', { from: undefined });
+      tailwindcss()
+    ]).process(input, { from: join(projectRoot, 'virtual.tailwind.css') });
 
     return result.css;
   } catch (error) {
@@ -144,33 +136,25 @@ function extractInlineStyles(
   const styles: Record<string, string> = {};
 
   try {
-    const ast = parseCSS(css);
+    const root = postcss.parse(css);
 
-    for (const rule of ast.stylesheet?.rules || []) {
-      if (rule.type !== 'rule') continue;
+    root.walkRules((rule) => {
+      const selectors = rule.selector?.split(',').map((s) => s.trim()) ?? [];
 
-      // 提取选择器中的类名（去掉前导的 .）
-      const selector = rule.selectors?.[0];
-      if (!selector) continue;
-
-      const className = selector.replace(/^\./, '').replace(/\\/g, '');
-      
-      // 检查是否在我们的类名列表中
-      const isMatched = classes.some(cls => {
-        // 处理特殊字符（如方括号）的转义
-        const escapedCls = cls.replace(/[[\]]/g, '\\$&');
-        return className === escapedCls || className.includes(cls);
+      const isMatched = selectors.some((selector) => {
+        if (!selector.startsWith('.')) return false;
+        const firstSegment = selector.split(/\s|:|>|\+|~/)[0];
+        if (!firstSegment) return false;
+        const className = firstSegment.replace(/^\./, '').replace(/\\/g, '');
+        return classes.some((cls) => className === cls || className.includes(cls));
       });
 
-      if (isMatched) {
-        // 提取所有 CSS 声明
-        for (const declaration of rule.declarations || []) {
-          if (declaration.type === 'declaration' && declaration.property && declaration.value) {
-            styles[declaration.property] = declaration.value;
-          }
-        }
-      }
-    }
+      if (!isMatched) return;
+
+      rule.walkDecls((decl) => {
+        styles[decl.prop] = decl.value;
+      });
+    });
   } catch (error) {
     console.error('CSS 解析失败:', error);
   }

@@ -13,9 +13,20 @@ const testConfig: TemplateConfig = {
   },
   styles: {
     h1: 'text-2xl font-bold text-center',
+    h3: 'text-lg font-bold',
     p: 'my-4 leading-relaxed',
+    ul: 'my-4 list-disc list-inside',
+    ol: 'my-4 list-decimal list-inside',
+    li: 'my-2',
     strong: 'font-bold text-[var(--brandColor)]',
     code: 'bg-gray-100 px-2 py-1 rounded',
+    hr: 'border-0 h-px bg-gray-300 my-8',
+    a: 'text-blue-600 underline',
+    img: 'max-w-full h-auto my-4',
+    table: 'w-full border-collapse my-4',
+    thead: 'bg-gray-100',
+    th: 'border border-gray-300 px-4 py-2 text-left font-bold',
+    td: 'border border-gray-300 px-4 py-2',
   },
 };
 
@@ -85,5 +96,56 @@ Another paragraph.
     expect(result.html).toContain('<p');
     expect(result.html).toContain('<strong');
     expect(result.html).toContain('<code');
+  });
+
+  test('嵌套有序列表缩进', async () => {
+    const markdown = `
+- 父项
+  1. 子项1
+  2. 子项2
+`.trim();
+
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+    expect(result.html).toContain('<ol');
+    expect(result.html).toContain('margin-left: 1.5em');
+  });
+
+  test('GFM 表格转换', async () => {
+    const markdown = `
+| A | B |
+| - | - |
+| 1 | 2 |
+`.trim();
+
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+    expect(result.html).toContain('<table');
+    expect(result.html).toContain('<td');
+  });
+
+  test('LaTeX 公式渲染为图片', async () => {
+    const markdown = '行内公式 $E = mc^2$ 和块公式：\n\n$$a+b$$';
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+
+    expect(result.html).toContain('https://latex.codecogs.com/svg.image?');
+  });
+
+  test('Mermaid 流程图渲染为图片', async () => {
+    const markdown = `
+\`\`\`mermaid
+graph TD;
+A-->B;
+\`\`\`
+`.trim();
+
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+    expect(result.html).toContain('https://mermaid.ink/img/');
+  });
+
+  test('文末收集并罗列外链', async () => {
+    const markdown = '[Google](https://www.google.com)';
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+
+    expect(result.html).toContain('参考链接');
+    expect(result.html).toContain('https://www.google.com');
   });
 });

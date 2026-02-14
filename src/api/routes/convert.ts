@@ -13,30 +13,44 @@ const convert = new Hono();
  */
 convert.post('/', async (c) => {
   try {
-    const { templateId, markdown, templateConfig } = await c.req.json();
+    const payload = await c.req.json().catch(() => ({} as Record<string, unknown>));
+    const templateId = (
+      payload.templateId ??
+      (payload.template as { id?: string } | undefined)?.id ??
+      payload.id
+    ) as string | undefined;
+    const markdown = (payload.markdown ?? payload.content ?? payload.text) as string | undefined;
+    const templateConfig = payload.templateConfig;
+
+    const missingParams: string[] = [];
+    if (!templateId) missingParams.push('templateId');
+    if (markdown === undefined || markdown === null) missingParams.push('markdown');
 
     // 参数验证
-    if (!templateId || !markdown) {
+    if (missingParams.length > 0) {
       return c.json({
         success: false,
         error: {
           code: 'INVALID_PARAMS',
-          message: '缺少必需参数：templateId 和 markdown',
+          message: `缺少必需参数：${missingParams.join(' 和 ')}`,
         },
       }, 400);
     }
+
+    const validTemplateId = templateId as string;
+    const markdownText = typeof markdown === 'string' ? markdown : String(markdown);
 
     // 获取数据库实例
     const db = await getDatabase();
 
     // 查找模板
-    const template = getTemplateById(db, templateId);
+    const template = getTemplateById(db, validTemplateId);
     if (!template) {
       return c.json({
         success: false,
         error: {
           code: 'TEMPLATE_NOT_FOUND',
-          message: `模板 ${templateId} 不存在`,
+          message: `模板 ${validTemplateId} 不存在`,
         },
       }, 404);
     }
@@ -44,8 +58,16 @@ convert.post('/', async (c) => {
     // 使用提供的配置或模板的配置
     const config = templateConfig || template.config;
 
+    if (markdownText.trim().length === 0) {
+      return c.json({
+        success: true,
+        html: '',
+        warnings: [],
+      });
+    }
+
     // 转换 Markdown
-    const { html, warnings } = await convertMarkdownToHTML(markdown, config);
+    const { html, warnings } = await convertMarkdownToHTML(markdownText, config);
 
     return c.json({
       success: true,

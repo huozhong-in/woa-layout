@@ -57,13 +57,27 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
           ? `${existingStyle}; ${styleString}`
           : styleString;
       }
+
+      if (tagName === 'li') {
+        for (const child of node.children || []) {
+          if (child.type !== 'element') continue;
+          if (child.tagName !== 'ul' && child.tagName !== 'ol') continue;
+
+          const existingStyle = (child.properties?.style as string) || '';
+          const nestedListStyle = 'margin-left: 1.5em; list-style-position: outside';
+          child.properties = child.properties || {};
+          child.properties.style = existingStyle
+            ? `${existingStyle}; ${nestedListStyle}`
+            : nestedListStyle;
+        }
+      }
     });
 
     // 将警告信息附加到树的 data 上（供后续使用）
-    const treeData = tree.data as TreeData;
     if (!tree.data) {
       tree.data = {};
     }
+    const treeData = tree.data as TreeData;
     treeData.warnings = allWarnings;
   };
 };

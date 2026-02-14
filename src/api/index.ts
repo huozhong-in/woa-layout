@@ -19,6 +19,27 @@ api.route('/convert', convert);
 api.route('/templates', templates);
 api.route('/assets', assets);
 
+// 默认 Markdown 内容
+api.get('/default-markdown', async (c) => {
+  try {
+    const file = Bun.file(new URL('../default.md', import.meta.url));
+    const content = await file.text();
+
+    return c.text(content, 200, {
+      'Content-Type': 'text/markdown; charset=utf-8',
+    });
+  } catch (error) {
+    console.error('读取默认 Markdown 失败:', error);
+    return c.json({
+      success: false,
+      error: {
+        code: 'DEFAULT_MARKDOWN_NOT_FOUND',
+        message: '默认 Markdown 文件不存在或读取失败',
+      },
+    }, 500);
+  }
+});
+
 // 健康检查
 api.get('/health', (c) => {
   return c.json({

@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { serveStatic } from 'hono/bun';
 import api from './api';
 import { getDatabase } from './lib/db';
 import index from './index.html';
@@ -12,19 +11,18 @@ const app = new Hono();
 // 挂载 API 路由
 app.route('/api', api);
 
-// 静态文件服务
-app.use('/assets/*', serveStatic({ root: './' }));
-
-// 前端路由（返回 index.html）
-app.get('/*', (c) => {
-  return c.html(index);
-});
-
 // 启动服务器
-export default {
+Bun.serve({
   port: 3000,
-  fetch: app.fetch,
-};
+  routes: {
+    '/api/*': app.fetch,
+    '/*': index,
+  },
+  development: {
+    hmr: true,
+    console: true,
+  },
+});
 
 console.log(`🚀 WOA-Layout 服务器启动成功！`);
 console.log(`📍 访问地址: http://localhost:3000`);

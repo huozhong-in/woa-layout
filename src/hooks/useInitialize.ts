@@ -4,12 +4,30 @@
 import { useEffect } from 'react';
 import { useAppStore } from '../store';
 import { useConverter } from './useConverter';
+import type { Template } from '../lib/db/types';
 
 export function useInitialize() {
-  const { setTemplates, setCurrentTemplate } = useAppStore();
+  const { markdown, setMarkdown, setTemplates, setCurrentTemplate } = useAppStore();
   const { convert } = useConverter();
 
   useEffect(() => {
+    async function loadDefaultMarkdown() {
+      const currentMarkdown = typeof markdown === 'string' ? markdown : '';
+      if (currentMarkdown.trim().length > 0) return;
+
+      try {
+        const response = await fetch('/api/default-markdown');
+        if (!response.ok) return;
+
+        const content = await response.text();
+        if (content.trim().length > 0) {
+          setMarkdown(content);
+        }
+      } catch (error) {
+        console.error('Failed to load default markdown:', error);
+      }
+    }
+
     // 加载所有模板
     async function loadTemplates() {
       try {
@@ -17,11 +35,12 @@ export function useInitialize() {
         const data = await response.json();
         
         if (data.success) {
-          setTemplates(data.templates);
+          const templates = (data.data ?? data.templates ?? []) as Template[];
+          setTemplates(templates);
           
           // 设置默认模板为当前模板
-          const defaultTemplate = data.templates.find(
-            (t: any) => t.name === 'default-simple' || t.is_default
+          const defaultTemplate = templates.find(
+            (t) => t.id === 'default-simple' || t.is_default === 1
           );
           if (defaultTemplate) {
             setCurrentTemplate(defaultTemplate);
@@ -34,6 +53,11 @@ export function useInitialize() {
       }
     }
 
-    loadTemplates();
-  }, [setTemplates, setCurrentTemplate, convert]);
+    async function initialize() {
+      await loadDefaultMarkdown();
+      await loadTemplates();
+    }
+
+    initialize();
+  }, [markdown, setMarkdown, setTemplates, setCurrentTemplate, convert]);
 }
