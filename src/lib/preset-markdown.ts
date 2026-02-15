@@ -72,7 +72,7 @@ interface Template {
 
 访问 [Bun 官方文档](https://bun.sh) 了解更多。
 
-![示例图片](https://via.placeholder.com/600x200/007aff/ffffff?text=WOA-Layout)
+![示例图片](https://github.com/user-attachments/assets/50282090-adfd-4ddb-9e27-c30753c6b161)
 
 ---
 
@@ -212,4 +212,4 @@ export const PRESET_MARKDOWNS: PresetMarkdown[] = [
   },
 ];
 
-export const DEFAULT_MARKDOWN = PRESET_MARKDOWNS[0].content;
+export const DEFAULT_MARKDOWN = PRESET_MARKDOWNS[0]?.content ?? '';
