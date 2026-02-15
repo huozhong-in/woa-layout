@@ -36,6 +36,14 @@ interface AppState {
   // 临时编辑的模板配置（用于实时预览）
   tempConfig: TemplateConfig | null;
   setTempConfig: (config: TemplateConfig | null) => void;
+
+  // 全局提示
+  toast: {
+    message: string;
+    type: 'info' | 'success' | 'error';
+  } | null;
+  showToast: (message: string, type?: 'info' | 'success' | 'error') => void;
+  clearToast: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -48,6 +56,7 @@ export const useAppStore = create<AppState>((set) => ({
   isConverting: false,
   hasUnsavedChanges: false,
   tempConfig: null,
+  toast: null,
 
   // Actions
   setCurrentTemplate: (template) => set({ currentTemplate: template }),
@@ -58,6 +67,8 @@ export const useAppStore = create<AppState>((set) => ({
   setIsConverting: (isConverting) => set({ isConverting }),
   setHasUnsavedChanges: (hasChanges) => set({ hasUnsavedChanges: hasChanges }),
   setTempConfig: (config) => set({ tempConfig: config }),
+  showToast: (message, type = 'info') => set({ toast: { message, type } }),
+  clearToast: () => set({ toast: null }),
 }));
 
 // 默认示例 Markdown

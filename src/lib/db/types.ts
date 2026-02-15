@@ -32,6 +32,14 @@ export interface Asset {
   uploaded_at: number;
 }
 
+export interface AssetReference {
+  templateId: string;
+  templateName: string;
+  sourceType: 'assets' | 'styles' | 'style-alias';
+  sourceKey: string;
+  sourceValue: string;
+}
+
 // 数据库行类型（从数据库读取时，config 是字符串）
 export interface TemplateRow {
   id: string;

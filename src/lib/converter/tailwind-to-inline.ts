@@ -42,25 +42,74 @@ export interface ConversionResult {
 export async function convertTailwindToInline(
   tagName: string,
   tailwindClasses: string,
-  variables: Record<string, string> = {}
+  variables: Record<string, string> = {},
+  assets: Record<string, string> = {}
 ): Promise<ConversionResult> {
-  // 1. 替换 CSS 变量
-  const processedClasses = replaceVariables(tailwindClasses, variables);
+  try {
+    // 1. 替换 CSS 变量
+    const processedClasses = replaceVariables(tailwindClasses, variables);
 
-  // 2. 移除不支持的前缀（hover:, before: 等）
-  const cleanedClasses = removeUnsupportedPrefixes(processedClasses);
+    // 2. 替换素材别名（@bg(alias) -> 实际 URL）
+    const { classes: classesWithAssets, warnings: aliasWarnings } = replaceAssetAliases(
+      processedClasses,
+      assets
+    );
 
-  // 4. 通过 PostCSS + Tailwind 生成 CSS
-  const css = await generateCSS(cleanedClasses);
+    // 3. 移除不支持的前缀（hover:, before: 等）
+    const cleanedClasses = removeUnsupportedPrefixes(classesWithAssets);
 
-  // 5. 解析 CSS 并提取样式
-  const classList = cleanedClasses.split(/\s+/).filter(Boolean);
-  const styles = extractInlineStyles(css, classList);
+    // 4. 通过 PostCSS + Tailwind 生成 CSS
+    const css = await generateCSS(cleanedClasses);
 
-  // 6. 过滤微信不支持的属性
-  const { filtered, warnings } = filterUnsupportedStyles(styles);
+    // 5. 解析 CSS 并提取样式
+    const classList = cleanedClasses.split(/\s+/).filter(Boolean);
+    const { styles, matchedClasses } = extractInlineStyles(css, classList);
 
-  return { styles: filtered, warnings };
+    // 6. 过滤微信不支持的属性
+    const { filtered, warnings } = filterUnsupportedStyles(styles);
+
+    // 7. 检测未识别的 Tailwind 类（通常是拼写错误/语法错误）
+    const unresolved = classList.filter((cls) => !matchedClasses.has(cls));
+    if (unresolved.length > 0) {
+      warnings.push(`未识别的 Tailwind 类：${unresolved.join(', ')}`);
+    }
+
+    return { styles: filtered, warnings: [...aliasWarnings, ...warnings] };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    return {
+      styles: {},
+      warnings: [`Tailwind 语法错误（${tagName}）：${message}`],
+    };
+  }
+}
+
+/**
+ * 替换素材别名：@bg(alias) -> assets[alias]
+ */
+function replaceAssetAliases(
+  classString: string,
+  assets: Record<string, string>
+): { classes: string; warnings: string[] } {
+  const warnings: string[] = [];
+
+  const classes = classString.replace(/@bg\(([^)]+)\)/g, (full, aliasRaw) => {
+    const alias = String(aliasRaw || '').trim();
+    if (!alias) {
+      warnings.push('检测到空素材别名：@bg()');
+      return full;
+    }
+
+    const resolved = assets[alias];
+    if (!resolved) {
+      warnings.push(`素材别名未配置：@bg(${alias})`);
+      return full;
+    }
+
+    return resolved;
+  });
+
+  return { classes, warnings };
 }
 
 /**
@@ -114,16 +163,11 @@ async function generateCSS(classes: string): Promise<string> {
 @tailwind utilities;
 `;
 
-  try {
-    const result = await postcss([
-      tailwindcss()
-    ]).process(input, { from: join(projectRoot, 'virtual.tailwind.css') });
+  const result = await postcss([
+    tailwindcss()
+  ]).process(input, { from: join(projectRoot, 'virtual.tailwind.css') });
 
-    return result.css;
-  } catch (error) {
-    console.error('PostCSS 处理失败:', error);
-    return '';
-  }
+  return result.css;
 }
 
 /**
@@ -132,8 +176,9 @@ async function generateCSS(classes: string): Promise<string> {
 function extractInlineStyles(
   css: string,
   classes: string[]
-): Record<string, string> {
+): { styles: Record<string, string>; matchedClasses: Set<string> } {
   const styles: Record<string, string> = {};
+  const matchedClasses = new Set<string>();
 
   try {
     const root = postcss.parse(css);
@@ -146,7 +191,12 @@ function extractInlineStyles(
         const firstSegment = selector.split(/\s|:|>|\+|~/)[0];
         if (!firstSegment) return false;
         const className = firstSegment.replace(/^\./, '').replace(/\\/g, '');
-        return classes.some((cls) => className === cls || className.includes(cls));
+        const matched = classes.find((cls) => className === cls || className.includes(cls));
+        if (matched) {
+          matchedClasses.add(matched);
+          return true;
+        }
+        return false;
       });
 
       if (!isMatched) return;
@@ -159,7 +209,7 @@ function extractInlineStyles(
     console.error('CSS 解析失败:', error);
   }
 
-  return styles;
+  return { styles, matchedClasses };
 }
 
 /**

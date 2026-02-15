@@ -2,7 +2,7 @@
 // 数据库初始化和操作函数
 
 import { Database } from 'bun:sqlite';
-import type { Template, TemplateRow, TemplateConfig, Asset } from './types';
+import type { Template, TemplateRow, TemplateConfig, Asset, AssetReference } from './types';
 
 // 数据库文件路径
 const DB_PATH = './data/woa-layout.db';
@@ -180,6 +180,78 @@ export function getAllAssets(db: Database): Asset[] {
 export function getAssetByFilename(db: Database, filename: string): Asset | null {
   const stmt = db.prepare('SELECT * FROM assets WHERE filename = ?');
   return stmt.get(filename) as Asset | null;
+}
+
+export function getAssetById(db: Database, id: number): Asset | null {
+  const stmt = db.prepare('SELECT * FROM assets WHERE id = ?');
+  return stmt.get(id) as Asset | null;
+}
+
+function containsAssetUrl(value: string, asset: Asset): boolean {
+  const normalized = value.trim();
+  if (!normalized) return false;
+
+  return (
+    normalized === asset.url
+    || normalized.includes(asset.url)
+    || normalized.includes(asset.filename)
+  );
+}
+
+export function findAssetReferences(db: Database, asset: Asset): AssetReference[] {
+  const templates = getAllTemplates(db);
+  const references: AssetReference[] = [];
+
+  for (const template of templates) {
+    const config = template.config;
+
+    if (config.assets) {
+      for (const [alias, value] of Object.entries(config.assets)) {
+        if (containsAssetUrl(String(value ?? ''), asset)) {
+          references.push({
+            templateId: template.id,
+            templateName: template.name,
+            sourceType: 'assets',
+            sourceKey: alias,
+            sourceValue: String(value ?? ''),
+          });
+        }
+      }
+    }
+
+    for (const [tagName, styleText] of Object.entries(config.styles || {})) {
+      const styleValue = String(styleText ?? '');
+      if (!styleValue.trim()) continue;
+
+      if (containsAssetUrl(styleValue, asset)) {
+        references.push({
+          templateId: template.id,
+          templateName: template.name,
+          sourceType: 'styles',
+          sourceKey: tagName,
+          sourceValue: styleValue,
+        });
+      }
+
+      const aliasMatches = Array.from(styleValue.matchAll(/@bg\(([^)]+)\)/g));
+      for (const match of aliasMatches) {
+        const alias = (match[1] || '').trim();
+        if (!alias) continue;
+        const mapped = config.assets?.[alias];
+        if (mapped && containsAssetUrl(mapped, asset)) {
+          references.push({
+            templateId: template.id,
+            templateName: template.name,
+            sourceType: 'style-alias',
+            sourceKey: `${tagName} -> ${alias}`,
+            sourceValue: styleValue,
+          });
+        }
+      }
+    }
+  }
+
+  return references;
 }
 
 export function deleteAsset(db: Database, id: number): void {

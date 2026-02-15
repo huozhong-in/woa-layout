@@ -6,11 +6,13 @@ import {
   getDatabase,
   createAsset,
   getAllAssets,
+  getAssetById,
   getAssetByFilename,
+  findAssetReferences,
   deleteAsset,
 } from '../../lib/db';
 import { join } from 'path';
-import { mkdir } from 'fs/promises';
+import { mkdir, rm } from 'fs/promises';
 
 const assets = new Hono();
 
@@ -46,6 +48,58 @@ assets.get('/', async (c) => {
       error: {
         code: 'DATABASE_ERROR',
         message: '获取素材列表失败',
+      },
+    }, 500);
+  }
+});
+
+/**
+ * GET /api/assets/references/:id
+ * 查询素材在所有模板中的引用情况
+ */
+assets.get('/references/:id', async (c) => {
+  try {
+    const id = parseInt(c.req.param('id'));
+
+    if (isNaN(id)) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: '无效的素材 ID',
+        },
+      }, 400);
+    }
+
+    const db = await getDatabase();
+    const asset = getAssetById(db, id);
+    if (!asset) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'ASSET_NOT_FOUND',
+          message: '素材不存在',
+        },
+      }, 404);
+    }
+
+    const references = findAssetReferences(db, asset);
+
+    return c.json({
+      success: true,
+      data: {
+        asset,
+        inUse: references.length > 0,
+        references,
+      },
+    });
+  } catch (error) {
+    console.error('查询素材引用失败:', error);
+    return c.json({
+      success: false,
+      error: {
+        code: 'REFERENCES_QUERY_ERROR',
+        message: '查询素材引用失败',
       },
     }, 500);
   }
@@ -222,9 +276,35 @@ assets.delete('/:id', async (c) => {
     }
 
     const db = await getDatabase();
+    const asset = getAssetById(db, id);
+    if (!asset) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'ASSET_NOT_FOUND',
+          message: '素材不存在',
+        },
+      }, 404);
+    }
+
+    const references = findAssetReferences(db, asset);
+    if (references.length > 0) {
+      return c.json({
+        success: false,
+        error: {
+          code: 'ASSET_IN_USE',
+          message: '素材仍被模板引用，不能删除',
+        },
+        data: {
+          asset,
+          references,
+        },
+      }, 409);
+    }
     
-    // TODO: 查找素材并删除文件
-    // 目前只删除数据库记录
+    const filePath = join(UPLOADS_DIR, asset.filename);
+    await rm(filePath, { force: true });
+
     deleteAsset(db, id);
 
     return c.json({

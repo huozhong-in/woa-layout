@@ -5,7 +5,7 @@ import { useEffect, useCallback } from 'react';
 import { useAppStore } from '../store';
 
 export function useConverter() {
-  const { setHtml, setWarnings, setIsConverting } = useAppStore();
+  const { setHtml, setWarnings, setIsConverting, showToast } = useAppStore();
 
   const convert = useCallback(async () => {
     const { markdown, currentTemplate, tempConfig } = useAppStore.getState();
@@ -32,7 +32,15 @@ export function useConverter() {
 
       if (data.success) {
         setHtml(data.html);
-        setWarnings(data.warnings || []);
+        const warningList = data.warnings || [];
+        setWarnings(warningList);
+
+        const tailwindWarning = warningList.find((warning: string) =>
+          /未识别的 Tailwind 类|Tailwind 语法错误|Tailwind 转换失败/.test(warning),
+        );
+        if (tailwindWarning) {
+          showToast(`样式配置有误：${tailwindWarning}`, 'error');
+        }
       } else {
         console.error('Conversion failed:', data.error);
         const errorMessage =
@@ -40,14 +48,16 @@ export function useConverter() {
             ? data.error
             : data.error?.message || '转换失败';
         setWarnings([errorMessage]);
+        showToast(`转换失败：${errorMessage}`, 'error');
       }
     } catch (error) {
       console.error('Conversion error:', error);
       setWarnings(['网络错误：无法连接到转换服务']);
+      showToast('网络错误：无法连接到转换服务', 'error');
     } finally {
       setIsConverting(false);
     }
-  }, [setHtml, setWarnings, setIsConverting]);
+  }, [setHtml, setWarnings, setIsConverting, showToast]);
 
   return { convert };
 }

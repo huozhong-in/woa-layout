@@ -22,7 +22,15 @@ export function Layout({ left, center, right }: LayoutProps) {
   const rightPanelRef = React.useRef<PanelImperativeHandle | null>(null);
   const [previewMode, setPreviewMode] = React.useState<'phone' | 'pc'>('phone');
   const [copied, setCopied] = React.useState(false);
-  const { html } = useAppStore();
+  const { html, toast, clearToast } = useAppStore();
+
+  React.useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => {
+      clearToast();
+    }, 3200);
+    return () => clearTimeout(timer);
+  }, [toast, clearToast]);
 
   const setPhonePreview = React.useCallback(() => {
     rightPanelRef.current?.resize('30%');
@@ -154,6 +162,22 @@ export function Layout({ left, center, right }: LayoutProps) {
           </aside>
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      {toast && (
+        <div className="fixed bottom-4 right-4 z-50 max-w-[520px] rounded-md border border-gray-200 bg-white px-3 py-2 shadow-lg">
+          <div
+            className={`text-sm ${
+              toast.type === 'error'
+                ? 'text-red-600'
+                : toast.type === 'success'
+                  ? 'text-green-600'
+                  : 'text-gray-700'
+            }`}
+          >
+            {toast.message}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

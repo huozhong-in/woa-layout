@@ -30,13 +30,16 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
         const { styles, warnings } = await convertTailwindToInline(
           tagName,
           tailwindClasses,
-          config.variables
+          config.variables,
+          config.assets || {}
         );
         
         styleCache[tagName] = styles;
-        allWarnings.push(...warnings);
+        allWarnings.push(...warnings.map((warning) => `[${tagName}] ${warning}`));
       } catch (error) {
         console.error(`转换标签 ${tagName} 的样式失败:`, error);
+        const message = error instanceof Error ? error.message : '未知错误';
+        allWarnings.push(`[${tagName}] Tailwind 转换失败：${message}`);
       }
     }
 

@@ -15,8 +15,8 @@ const testConfig: TemplateConfig = {
     h1: 'text-2xl font-bold text-center',
     h3: 'text-lg font-bold',
     p: 'my-4 leading-relaxed',
-    ul: 'my-4 list-disc list-inside',
-    ol: 'my-4 list-decimal list-inside',
+    ul: 'my-4 list-disc list-outside',
+    ol: 'my-4 list-decimal list-outside',
     li: 'my-2',
     strong: 'font-bold text-[var(--brandColor)]',
     code: 'bg-gray-100 px-2 py-1 rounded',
@@ -126,7 +126,8 @@ Another paragraph.
     const markdown = '行内公式 $E = mc^2$ 和块公式：\n\n$$a+b$$';
     const result = await convertMarkdownToHTML(markdown, testConfig);
 
-    expect(result.html).toContain('https://latex.codecogs.com/svg.image?');
+    // 更新为 PNG 格式
+    expect(result.html).toContain('https://latex.codecogs.com/png.image?');
   });
 
   test('Mermaid 流程图渲染为图片', async () => {
@@ -147,5 +148,25 @@ A-->B;
 
     expect(result.html).toContain('参考链接');
     expect(result.html).toContain('https://www.google.com');
+  });
+
+  test('@bg(alias) 自动替换为素材 URL', async () => {
+    const aliasToken = `@bg(${['divider'].join('')})`;
+    const bgClass = `bg-${`[url('${aliasToken}')]`}`;
+    const configWithAssets: TemplateConfig = {
+      ...testConfig,
+      assets: {
+        divider: '/api/assets/demo-divider.svg',
+      },
+      styles: {
+        ...testConfig.styles,
+        hr: `my-8 h-px border-0 ${bgClass} bg-no-repeat bg-center bg-contain`,
+      },
+    };
+
+    const result = await convertMarkdownToHTML('---', configWithAssets);
+    expect(result.html).toContain('background-image:');
+    expect(result.html).toContain('/api/assets/demo-divider.svg');
+    expect(result.html).not.toContain('@bg(divider)');
   });
 });
