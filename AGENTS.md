@@ -8,6 +8,8 @@ alwaysApply: true
 
 这是一个微信公众号 Markdown 排版工具，使用 Bun 作为运行时。
 
+产品功能定义见 [产品文档](docs/PRD.md)。
+
 ## 项目特定技术栈
 
 ### 核心技术

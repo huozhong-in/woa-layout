@@ -11,6 +11,7 @@ export interface Template {
 }
 
 export interface TemplateConfig {
+  global?: GlobalConfig;
   variables: {
     [key: string]: string; // 如：brandColor, accentColor, textColor
   };
@@ -20,6 +21,13 @@ export interface TemplateConfig {
   styles: {
     [tagName: string]: string; // HTML 标签名 → TailwindCSS 类名
   };
+}
+
+export interface GlobalConfig {
+  themeColor?: string;
+  fontFamily?: string;
+  baseFontSize?: 'sm' | 'base' | 'lg';
+  codeTheme?: 'light' | 'dark' | 'androidstudio';
 }
 
 export interface Asset {

@@ -1,21 +1,5 @@
-# bun-react-tailwind-shadcn-template
+# 项目简介
 
-To install dependencies:
+这是一个微信公众号 Markdown 排版工具，支持**通过API方式调用**完成从 Markdown 转换为微信编辑器兼容的 HTML 格式，提供模板管理和样式调试功能。
 
-```bash
-bun install
-```
-
-To start a development server:
-
-```bash
-bun dev
-```
-
-To run for production:
-
-```bash
-bun start
-```
-
-This project was created using `bun init` in bun v1.3.8. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+产品功能定义详情见 [产品文档](docs/PRD.md)。

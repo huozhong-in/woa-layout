@@ -169,4 +169,48 @@ A-->B;
     expect(result.html).toContain('/api/assets/demo-divider.svg');
     expect(result.html).not.toContain('@bg(divider)');
   });
+
+  test('全局配置可注入主题色、字体、字号与代码主题', async () => {
+    const globalConfig: TemplateConfig = {
+      global: {
+        themeColor: '#ff4d4f',
+        fontFamily: 'Georgia, serif',
+        baseFontSize: 'lg',
+        codeTheme: 'dark',
+      },
+      variables: {},
+      styles: {
+        p: 'my-4',
+        a: 'underline',
+        code: 'px-1 rounded',
+        pre: 'p-4 rounded',
+      },
+    };
+
+    const markdown = '段落内容\n\n[链接](https://example.com)\n\n`inline`\n\n```js\nconst a = 1\n```';
+    const result = await convertMarkdownToHTML(markdown, globalConfig);
+
+    expect(result.html).toContain('font-family: Georgia, serif');
+    expect(result.html).toContain('font-size: 18px');
+    expect(result.html).toContain('color: #ff4d4f');
+    expect(result.html).toContain('background-color: #1f2937');
+  });
+
+  test('行内 code 与块级 pre>code 样式分离', async () => {
+    const codeSplitConfig: TemplateConfig = {
+      variables: {},
+      styles: {
+        p: 'my-4',
+        pre: 'bg-teal-300 text-gray-100 p-4 rounded my-4 overflow-x-auto',
+        'code-inline': 'bg-yellow-200 text-red-700 px-1 py-0.5 rounded',
+      },
+    };
+
+    const markdown = '这是行内代码：`const x = 1`\n\n```ts\nconst y = 2\n```';
+    const result = await convertMarkdownToHTML(markdown, codeSplitConfig);
+
+    expect(result.html).toContain('background-color: var(--color-yellow-200)');
+    expect(result.html).toContain('background-color: var(--color-teal-300)');
+    expect(result.html).toContain('background-color: transparent');
+  });
 });

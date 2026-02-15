@@ -5,7 +5,7 @@ import { visit } from 'unist-util-visit';
 import type { Plugin } from 'unified';
 import type { Element } from 'hast';
 import { convertTailwindToInline, stylesToString } from './tailwind-to-inline';
-import type { TemplateConfig } from '../db/types';
+import type { GlobalConfig, TemplateConfig } from '../db/types';
 
 interface StyleCache {
   [tagName: string]: Record<string, string>;
@@ -16,6 +16,18 @@ interface TreeData {
   warnings?: string[];
 }
 
+const BLOCK_CODE_INNER_RESET: Record<string, string> = {
+  'background-color': 'transparent',
+  color: 'inherit',
+  'padding-top': '0',
+  'padding-right': '0',
+  'padding-bottom': '0',
+  'padding-left': '0',
+  'border-radius': '0px',
+  'font-size': 'inherit',
+  'line-height': 'inherit',
+};
+
 /**
  * rehype 插件：根据模板配置注入内联样式
  */
@@ -23,6 +35,13 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
   return async (tree) => {
     const styleCache: StyleCache = {};
     const allWarnings: string[] = [];
+    const globalDefaults = buildGlobalStyleDefaults(config.global);
+    const effectiveVariables = {
+      ...config.variables,
+      ...(config.global?.themeColor && !config.variables?.brandColor
+        ? { brandColor: config.global.themeColor }
+        : {}),
+    };
 
     // 预处理：转换所有标签的样式
     for (const [tagName, tailwindClasses] of Object.entries(config.styles)) {
@@ -30,11 +49,11 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
         const { styles, warnings } = await convertTailwindToInline(
           tagName,
           tailwindClasses,
-          config.variables,
+          effectiveVariables,
           config.assets || {}
         );
         
-        styleCache[tagName] = styles;
+        styleCache[tagName] = mergeWithDefaults(styles, globalDefaults[tagName]);
         allWarnings.push(...warnings.map((warning) => `[${tagName}] ${warning}`));
       } catch (error) {
         console.error(`转换标签 ${tagName} 的样式失败:`, error);
@@ -43,10 +62,24 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
       }
     }
 
+    for (const [tagName, defaults] of Object.entries(globalDefaults)) {
+      styleCache[tagName] = mergeWithDefaults(styleCache[tagName] || {}, defaults);
+    }
+
     // 遍历 HAST 树，注入样式
-    visit(tree, 'element', (node: Element) => {
+    visit(tree, 'element', (node: Element, _index, parent: any) => {
       const tagName = node.tagName;
-      const styles = styleCache[tagName];
+      let styles = styleCache[tagName];
+
+      if (tagName === 'code') {
+        const isInPre = parent && parent.type === 'element' && parent.tagName === 'pre';
+
+        if (isInPre) {
+          styles = BLOCK_CODE_INNER_RESET;
+        } else {
+          styles = styleCache['code-inline'] || styleCache.code;
+        }
+      }
 
       if (styles && Object.keys(styles).length > 0) {
         const styleString = stylesToString(styles);
@@ -88,3 +121,112 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
     treeData.warnings = allWarnings;
   };
 };
+
+function mergeWithDefaults(
+  base: Record<string, string>,
+  defaults?: Record<string, string>
+): Record<string, string> {
+  if (!defaults) return base;
+
+  const merged: Record<string, string> = { ...base };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (merged[key] === undefined || merged[key] === '') {
+      merged[key] = value;
+    }
+  }
+  return merged;
+}
+
+function buildGlobalStyleDefaults(global?: GlobalConfig): StyleCache {
+  if (!global) return {};
+
+  const defaults: StyleCache = {};
+
+  const textTags = ['p', 'li', 'blockquote', 'td', 'th'];
+  const titleTags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  const codeTags = ['code', 'pre'];
+
+  if (global.fontFamily) {
+    for (const tag of [...textTags, ...titleTags, ...codeTags]) {
+      defaults[tag] = {
+        ...(defaults[tag] || {}),
+        'font-family': global.fontFamily,
+      };
+    }
+  }
+
+  if (global.baseFontSize) {
+    const sizeMap: Record<NonNullable<GlobalConfig['baseFontSize']>, string> = {
+      sm: '14px',
+      base: '16px',
+      lg: '18px',
+    };
+    const fontSize = sizeMap[global.baseFontSize];
+
+    for (const tag of textTags) {
+      defaults[tag] = {
+        ...(defaults[tag] || {}),
+        'font-size': fontSize,
+      };
+    }
+  }
+
+  if (global.themeColor) {
+    defaults.a = {
+      ...(defaults.a || {}),
+      color: global.themeColor,
+    };
+
+    defaults.h2 = {
+      ...(defaults.h2 || {}),
+      'border-left-color': global.themeColor,
+    };
+  }
+
+  if (global.codeTheme) {
+    const themes: Record<NonNullable<GlobalConfig['codeTheme']>, { pre: Record<string, string>; code: Record<string, string> }> = {
+      light: {
+        pre: {
+          'background-color': '#f6f8fa',
+          color: '#24292f',
+        },
+        code: {
+          'background-color': '#f3f4f6',
+          color: '#c7254e',
+        },
+      },
+      dark: {
+        pre: {
+          'background-color': '#1f2937',
+          color: '#e5e7eb',
+        },
+        code: {
+          'background-color': '#111827',
+          color: '#93c5fd',
+        },
+      },
+      androidstudio: {
+        pre: {
+          'background-color': '#2b2b2b',
+          color: '#a9b7c6',
+        },
+        code: {
+          'background-color': '#2b2b2b',
+          color: '#a9b7c6',
+        },
+      },
+    };
+
+    const selected = themes[global.codeTheme];
+    defaults.pre = {
+      ...(defaults.pre || {}),
+      ...selected.pre,
+    };
+    defaults.code = {
+      ...(defaults.code || {}),
+      ...selected.code,
+    };
+  }
+
+  return defaults;
+}

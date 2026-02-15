@@ -18,9 +18,29 @@ const categories: CategoryConfig[] = [
   { key: 'h1', label: '标题类', tags: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] },
   { key: 'p', label: '段落类', tags: ['p', 'blockquote'] },
   { key: 'ul', label: '列表类', tags: ['ul', 'ol', 'li'] },
-  { key: 'a', label: '链接与强调', tags: ['a', 'strong', 'em', 'code'] },
-  { key: 'pre', label: '代码块', tags: ['pre'] },
+  { key: 'a', label: '链接与强调', tags: ['a', 'strong', 'em'] },
+  { key: 'pre', label: '代码块', tags: ['pre', 'code-inline'] },
   { key: 'img', label: '图片', tags: ['img'] },
+];
+
+const fontFamilyOptions = [
+  { label: '系统默认', value: 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif' },
+  { label: '衬线', value: 'Georgia, "Times New Roman", "Songti SC", serif' },
+  { label: '无衬线', value: 'Arial, "Helvetica Neue", "PingFang SC", sans-serif' },
+  { label: '等宽', value: 'Menlo, Monaco, Consolas, "Liberation Mono", monospace' },
+];
+const DEFAULT_FONT_FAMILY = 'system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif';
+
+const baseFontSizeOptions = [
+  { label: '偏小（14px）', value: 'sm' },
+  { label: '标准（16px）', value: 'base' },
+  { label: '偏大（18px）', value: 'lg' },
+];
+
+const codeThemeOptions = [
+  { label: 'Android Studio', value: 'androidstudio' },
+  { label: '浅色', value: 'light' },
+  { label: '深色', value: 'dark' },
 ];
 
 export function StyleConfigurator() {
@@ -51,8 +71,9 @@ export function StyleConfigurator() {
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // 使用当前模板配置或临时配置
-  const config = tempConfig || currentTemplate?.config || { variables: {}, styles: {} };
+  const config = tempConfig || currentTemplate?.config || { global: {}, variables: {}, styles: {} };
   const assetAliases = Object.keys(config.assets || {});
+  const globalConfig = config.global || {};
   const isDefaultTemplate = currentTemplate?.is_default === 1;
   const saveButtonLabel = isDefaultTemplate ? '另存为' : '保存模板';
   const convertApiUrl = `${window.location.origin}/api/convert`;
@@ -310,6 +331,20 @@ export function StyleConfigurator() {
     setHasUnsavedChanges(true);
   };
 
+  const handleGlobalChange = (
+    key: 'themeColor' | 'fontFamily' | 'baseFontSize' | 'codeTheme',
+    value: string,
+  ) => {
+    setTempConfig({
+      ...config,
+      global: {
+        ...(config.global || {}),
+        [key]: value,
+      },
+    });
+    setHasUnsavedChanges(true);
+  };
+
   const handleStyleBlur = async () => {
     await convert();
   };
@@ -460,6 +495,18 @@ export function StyleConfigurator() {
     setOpenCategory(openCategory === categoryKey ? null : categoryKey);
   };
 
+  const getStyleValue = (tag: string): string => {
+    if (tag === 'code-inline') {
+      return config.styles['code-inline'] || config.styles.code || '';
+    }
+    return config.styles[tag] || '';
+  };
+
+  const getTagLabel = (tag: string): string => {
+    if (tag === 'code-inline') return 'code-inline（行内代码）';
+    return tag;
+  };
+
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-gray-200">
@@ -526,6 +573,79 @@ export function StyleConfigurator() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        <div className="px-4 py-3 border-b border-gray-200 bg-white space-y-3">
+          <h3 className="text-xs font-semibold text-gray-700">全局配置</h3>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">主题色</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={globalConfig.themeColor || '#2563eb'}
+                onChange={(e) => handleGlobalChange('themeColor', e.target.value)}
+                onBlur={handleStyleBlur}
+                className="h-7 w-10 border border-gray-300 rounded bg-white"
+              />
+              <input
+                type="text"
+                value={globalConfig.themeColor || ''}
+                onChange={(e) => handleGlobalChange('themeColor', e.target.value)}
+                onBlur={handleStyleBlur}
+                placeholder="#2563eb"
+                className="flex-1 text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">字体</label>
+            <select
+              value={globalConfig.fontFamily || DEFAULT_FONT_FAMILY}
+              onChange={(e) => handleGlobalChange('fontFamily', e.target.value)}
+              onBlur={handleStyleBlur}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              {fontFamilyOptions.map((option) => (
+                <option key={option.label} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">字号</label>
+            <select
+              value={globalConfig.baseFontSize || 'base'}
+              onChange={(e) => handleGlobalChange('baseFontSize', e.target.value)}
+              onBlur={handleStyleBlur}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              {baseFontSizeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">代码块主题</label>
+            <select
+              value={globalConfig.codeTheme || 'androidstudio'}
+              onChange={(e) => handleGlobalChange('codeTheme', e.target.value)}
+              onBlur={handleStyleBlur}
+              className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+            >
+              {codeThemeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {categories.map((category) => (
           <div key={category.key} className="border-b border-gray-200">
             <button
@@ -545,11 +665,11 @@ export function StyleConfigurator() {
                 {category.tags.map((tag) => (
                   <div key={tag}>
                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                      {tag}
+                      {getTagLabel(tag)}
                     </label>
                     <input
                       type="text"
-                      value={config.styles[tag] || ''}
+                      value={getStyleValue(tag)}
                       onChange={(e) => handleStyleChange(tag, e.target.value)}
                       onBlur={handleStyleBlur}
                       className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
