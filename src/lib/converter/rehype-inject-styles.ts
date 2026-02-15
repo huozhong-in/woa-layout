@@ -66,6 +66,14 @@ export const rehypeInjectStyles: Plugin<[TemplateConfig]> = (config) => {
       styleCache[tagName] = mergeWithDefaults(styleCache[tagName] || {}, defaults);
     }
 
+    const hrStyles = styleCache.hr;
+    if (hrStyles?.['background-image'] && !hrStyles['background-size']) {
+      styleCache.hr = {
+        ...hrStyles,
+        'background-size': '100% 100%',
+      };
+    }
+
     // 遍历 HAST 树，注入样式
     visit(tree, 'element', (node: Element, _index, parent: any) => {
       const tagName = node.tagName;

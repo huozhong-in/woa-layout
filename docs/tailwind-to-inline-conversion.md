@@ -84,6 +84,60 @@
 
 ### 2.2 详细步骤
 
+#### 素材别名用法（`@bg(alias)`）
+
+为了避免在样式中重复粘贴长 URL，支持将背景图地址抽到 `config.assets`，在 Tailwind 任意值中通过别名引用。
+
+**配置结构**：
+
+```json
+{
+  "assets": {
+    "divider": "/api/assets/overseas-divider.svg?v=2"
+  },
+  "styles": {
+    "hr": "my-[40px] border-0 h-[24px] w-full bg-[url(@bg(divider))] bg-no-repeat bg-center bg-[length:100%_100%]"
+  }
+}
+```
+
+**关键语法（必须）**：
+- ✅ 正确：`bg-[url(@bg(divider))]`（无引号）
+- ❌ 错误：`bg-[url("@bg(divider)")]` 或 `bg-[url('@bg(divider)')]`
+
+**推荐流程**：
+1. 上传图片/SVG，获取素材 URL。
+2. 将 URL 写入 `config.assets.<alias>`（如 `divider`）。
+3. 在样式中使用 `@bg(alias)`，例如 `hr` 对应 Markdown `---`。
+4. 后续只改 `config.assets.<alias>` 即可切换素材，不需改样式字符串。
+
+**实现说明**：
+- 转换阶段会先做别名替换：`@bg(alias) -> assets[alias]`。
+- 若 alias 未配置，会产生日志警告（`素材别名未配置`）。
+- 额外规范化 `url("...")` / `url('...')` 为 `url(...)`，防止请求 URL 含 `%22`。
+
+**排查清单**：
+- `hr` 是否命中（Markdown 是否使用 `---`）。
+- `config.assets.divider` 是否存在且可访问。
+- DevTools 中 `background-image` 是否为 `/api/assets/...`，且不含 `%22`。
+- 是否有有效高度（如 `h-[24px]`）和背景尺寸（如 `bg-[length:100%_100%]`）。
+
+#### 正文素材标记（`{{asset:alias}}`）
+
+除了背景图别名，当前转换链路还支持在 Markdown 正文里直接引用素材别名。
+
+**写法**：
+- 在 Markdown 中输入：`{{asset:cover}}`
+
+**行为**：
+1. 在 Markdown 预处理阶段，将 `{{asset:cover}}` 转成 `![](<assets.cover 对应 URL>)`。
+2. 随后按常规图片节点参与转换（样式仍由 `img` 配置控制）。
+3. 若 alias 未配置，保留原标记并输出 warning，便于定位问题。
+
+**适用场景**：
+- 同一素材在多篇内容复用（如封面、作者头像、底部引导图）。
+- 只改 `config.assets` 即可全局替换，不需要逐篇替换 URL。
+
 #### 步骤 1：读取模板并替换变量
 
 ```typescript

@@ -164,7 +164,7 @@ export function Layout({ left, center, right }: LayoutProps) {
       </ResizablePanelGroup>
 
       {toast && (
-        <div className="fixed bottom-4 right-4 z-50 max-w-[520px] rounded-md border border-gray-200 bg-white px-3 py-2 shadow-lg">
+        <div className="fixed bottom-4 right-4 z-50 max-w-130 rounded-md border border-gray-200 bg-white px-3 py-2 shadow-lg">
           <div
             className={`text-sm ${
               toast.type === 'error'

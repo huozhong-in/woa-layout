@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../store';
 import type { Asset, AssetReference, TemplateConfig } from '../lib/db/types';
 import { useConverter } from '../hooks/useConverter';
+import { showActionErrorToast, showNetworkErrorToast } from '../lib/ui-feedback';
 
 type TagCategory = string;
 
@@ -17,6 +18,7 @@ interface CategoryConfig {
 const categories: CategoryConfig[] = [
   { key: 'h1', label: '标题类', tags: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] },
   { key: 'p', label: '段落类', tags: ['p', 'blockquote'] },
+  { key: 'hr', label: '分隔线', tags: ['hr'] },
   { key: 'ul', label: '列表类', tags: ['ul', 'ol', 'li'] },
   { key: 'a', label: '链接与强调', tags: ['a', 'strong', 'em'] },
   { key: 'pre', label: '代码块', tags: ['pre', 'code-inline'] },
@@ -68,6 +70,8 @@ export function StyleConfigurator() {
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [selectedAssetFile, setSelectedAssetFile] = useState<File | null>(null);
   const [assetFileInputKey, setAssetFileInputKey] = useState(0);
+  const [assetAliasInput, setAssetAliasInput] = useState('');
+  const [assetAliasUrlInput, setAssetAliasUrlInput] = useState('');
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   // 使用当前模板配置或临时配置
@@ -77,6 +81,9 @@ export function StyleConfigurator() {
   const isDefaultTemplate = currentTemplate?.is_default === 1;
   const saveButtonLabel = isDefaultTemplate ? '另存为' : '保存模板';
   const convertApiUrl = `${window.location.origin}/api/convert`;
+  const toastApiError = (action: string, payload: unknown, fallback: string) =>
+    showActionErrorToast(showToast, action, payload, fallback);
+  const toastNetError = (action: string) => showNetworkErrorToast(showToast, action);
 
   function confirmDiscardIfNeeded(message: string): boolean {
     const { hasUnsavedChanges } = useAppStore.getState();
@@ -90,12 +97,12 @@ export function StyleConfigurator() {
       const response = await fetch('/api/assets');
       const data = await response.json();
       if (!data.success) {
-        showToast(data.error?.message || '获取素材失败', 'error');
+        toastApiError('获取素材', data, '获取素材失败');
         return;
       }
       setAssets(data.data || []);
     } catch {
-      showToast('获取素材失败', 'error');
+      toastNetError('获取素材');
     } finally {
       setIsAssetsLoading(false);
     }
@@ -125,7 +132,7 @@ export function StyleConfigurator() {
       const data = await response.json();
 
       if (!data.success) {
-        showToast(data.error?.message || '上传素材失败', 'error');
+        toastApiError('上传素材', data, '上传素材失败');
         return;
       }
 
@@ -134,7 +141,7 @@ export function StyleConfigurator() {
       await loadAssets();
       showToast('素材上传成功', 'success');
     } catch {
-      showToast('上传素材失败', 'error');
+      toastNetError('上传素材');
     } finally {
       setIsUploadingAsset(false);
     }
@@ -145,7 +152,7 @@ export function StyleConfigurator() {
       const response = await fetch(`/api/assets/references/${assetId}`);
       const data = await response.json();
       if (!data.success) {
-        showToast(data.error?.message || '查询引用失败', 'error');
+        toastApiError('查询素材引用', data, '查询引用失败');
         return;
       }
 
@@ -154,7 +161,7 @@ export function StyleConfigurator() {
         [assetId]: data.data?.references || [],
       }));
     } catch {
-      showToast('查询引用失败', 'error');
+      toastNetError('查询素材引用');
     }
   }
 
@@ -176,14 +183,14 @@ export function StyleConfigurator() {
           return;
         }
 
-        showToast(data.error?.message || '删除素材失败', 'error');
+        toastApiError('删除素材', data, '删除素材失败');
         return;
       }
 
       await loadAssets();
       showToast('素材删除成功', 'success');
     } catch {
-      showToast('删除素材失败', 'error');
+      toastNetError('删除素材');
     }
   }
 
@@ -195,6 +202,53 @@ export function StyleConfigurator() {
     } catch {
       showToast('复制素材 URL 失败', 'error');
     }
+  }
+
+  async function upsertAssetAlias(aliasRaw: string, urlRaw: string) {
+    const alias = aliasRaw.trim();
+    const url = urlRaw.trim();
+
+    if (!alias) {
+      showToast('别名不能为空', 'error');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(alias)) {
+      showToast('别名仅支持字母、数字、下划线和中划线', 'error');
+      return;
+    }
+    if (!url) {
+      showToast('素材 URL 不能为空', 'error');
+      return;
+    }
+
+    const normalizedUrl = url.startsWith('/') ? url : `/${url.replace(/^\/+/, '')}`;
+    const nextConfig = {
+      ...config,
+      assets: {
+        ...(config.assets || {}),
+        [alias]: normalizedUrl,
+      },
+    };
+
+    setTempConfig(nextConfig);
+    setHasUnsavedChanges(true);
+    setAssetAliasInput('');
+    setAssetAliasUrlInput('');
+    showToast(`已绑定别名 ${alias}`, 'success');
+    await convert();
+  }
+
+  async function removeAssetAlias(alias: string) {
+    const nextAssets = { ...(config.assets || {}) };
+    delete nextAssets[alias];
+
+    setTempConfig({
+      ...config,
+      assets: nextAssets,
+    });
+    setHasUnsavedChanges(true);
+    showToast(`已删除别名 ${alias}`, 'success');
+    await convert();
   }
 
   useEffect(() => {
@@ -252,7 +306,7 @@ export function StyleConfigurator() {
 
       const data = await response.json();
       if (!data.success) {
-        showToast(`样式校验失败：${data.error?.message || '转换失败'}`, 'error');
+        toastApiError('样式校验', data, '转换失败');
         return false;
       }
 
@@ -268,8 +322,7 @@ export function StyleConfigurator() {
 
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : '网络异常';
-      showToast(`样式校验失败：${message}`, 'error');
+      toastNetError('样式校验');
       return false;
     }
   }
@@ -371,7 +424,7 @@ export function StyleConfigurator() {
 
     const data = await response.json();
     if (!data.success) {
-      showToast(data.error?.message || '保存模板失败', 'error');
+      toastApiError('保存模板', data, '保存模板失败');
       return;
     }
 
@@ -393,7 +446,7 @@ export function StyleConfigurator() {
     });
     const data = await response.json();
     if (!data.success) {
-      showToast(data.error?.message || '删除模板失败', 'error');
+      toastApiError('删除模板', data, '删除模板失败');
       return;
     }
 
@@ -434,7 +487,7 @@ export function StyleConfigurator() {
       });
       const data = await response.json();
       if (!data.success) {
-        showToast(data.error?.message || '另存为失败', 'error');
+        toastApiError('另存为模板', data, '另存为失败');
         return;
       }
 
@@ -455,7 +508,7 @@ export function StyleConfigurator() {
       });
       const data = await response.json();
       if (!data.success) {
-        showToast(data.error?.message || '改名失败', 'error');
+        toastApiError('模板改名', data, '改名失败');
         return;
       }
 
@@ -560,14 +613,14 @@ export function StyleConfigurator() {
                   <span
                     key={alias}
                     className="text-[11px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100"
-                    title={`示例：bg-[url('@bg(${alias})')]`}
+                    title={`示例：bg-[url(@bg(${alias}))]`}
                   >
                     {alias}
                   </span>
                 ))}
               </div>
             )}
-            <p className="text-[11px] text-gray-500">写法示例：bg-[url('@bg(divider)')]</p>
+            <p className="text-[11px] text-gray-500">写法示例：bg-[url(@bg(divider))]</p>
           </div>
         </div>
       </div>
@@ -798,6 +851,64 @@ export function StyleConfigurator() {
               )}
             </div>
 
+            <div className="rounded border border-gray-200 p-3 mb-3 space-y-2">
+              <p className="text-xs text-gray-500">素材别名映射（供 `@bg(alias)` 与 {'{{asset:alias}}'} 使用）</p>
+              <div className="grid grid-cols-12 gap-2">
+                <input
+                  type="text"
+                  value={assetAliasInput}
+                  onChange={(e) => setAssetAliasInput(e.target.value)}
+                  placeholder="别名，如 divider"
+                  className="col-span-3 text-xs border border-gray-300 rounded px-2 py-1"
+                />
+                <input
+                  type="text"
+                  value={assetAliasUrlInput}
+                  onChange={(e) => setAssetAliasUrlInput(e.target.value)}
+                  placeholder="素材 URL，如 /api/assets/xxx.svg"
+                  className="col-span-7 text-xs border border-gray-300 rounded px-2 py-1"
+                />
+                <button
+                  onClick={() => upsertAssetAlias(assetAliasInput, assetAliasUrlInput)}
+                  className="col-span-2 text-xs rounded bg-gray-800 text-white hover:bg-black px-2"
+                >
+                  绑定
+                </button>
+              </div>
+
+              {Object.keys(config.assets || {}).length === 0 ? (
+                <p className="text-[11px] text-gray-400">当前模板暂无别名映射</p>
+              ) : (
+                <div className="space-y-1">
+                  {Object.entries(config.assets || {}).map(([alias, url]) => (
+                    <div key={alias} className="flex items-center gap-2 rounded border border-gray-100 px-2 py-1">
+                      <span className="text-xs font-medium text-gray-700 w-28 truncate">{alias}</span>
+                      <span className="text-[11px] text-gray-500 flex-1 truncate">{url}</span>
+                      <button
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(`{{asset:${alias}}}`);
+                            showToast('自定义标记已复制', 'success');
+                          } catch {
+                            showToast('复制失败', 'error');
+                          }
+                        }}
+                        className="text-[11px] text-blue-600 hover:text-blue-700"
+                      >
+                        复制标记
+                      </button>
+                      <button
+                        onClick={() => removeAssetAlias(alias)}
+                        className="text-[11px] text-red-600 hover:text-red-700"
+                      >
+                        删除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500">共 {assets.length} 个素材</span>
               <button
@@ -837,6 +948,19 @@ export function StyleConfigurator() {
                             className="text-xs text-blue-600 hover:text-blue-700"
                           >
                             复制 URL
+                          </button>
+                          <button
+                            onClick={() => {
+                              const suggestedAlias = asset.original_name
+                                .replace(/\.[^.]+$/, '')
+                                .replace(/[^a-zA-Z0-9-_]/g, '-')
+                                .toLowerCase() || 'asset';
+                              setAssetAliasInput(suggestedAlias);
+                              setAssetAliasUrlInput(asset.url);
+                            }}
+                            className="text-xs text-gray-600 hover:text-gray-700"
+                          >
+                            设为别名
                           </button>
                           <button
                             onClick={() => queryAssetReferences(asset.id)}

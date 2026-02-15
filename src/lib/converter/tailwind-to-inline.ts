@@ -55,8 +55,10 @@ export async function convertTailwindToInline(
       assets
     );
 
+    const normalizedUrlClasses = normalizeUrlFunctionQuotes(classesWithAssets);
+
     // 3. 移除不支持的前缀（hover:, before: 等）
-    const cleanedClasses = removeUnsupportedPrefixes(classesWithAssets);
+    const cleanedClasses = removeUnsupportedPrefixes(normalizedUrlClasses);
 
     // 4. 通过 PostCSS + Tailwind 生成 CSS
     const css = await generateCSS(cleanedClasses);
@@ -82,6 +84,16 @@ export async function convertTailwindToInline(
       warnings: [`Tailwind 语法错误（${tagName}）：${message}`],
     };
   }
+}
+
+/**
+ * 规范化 url() 内的引号，避免浏览器将引号作为 URL 字符请求。
+ * 例如：url("/api/a.svg") -> url(/api/a.svg)
+ */
+function normalizeUrlFunctionQuotes(classString: string): string {
+  return classString.replace(/url\((['"])(.*?)\1\)/g, (_full, _quote, inner) => {
+    return `url(${inner})`;
+  });
 }
 
 /**

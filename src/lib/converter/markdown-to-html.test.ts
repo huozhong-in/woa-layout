@@ -213,4 +213,24 @@ A-->B;
     expect(result.html).toContain('background-color: var(--color-teal-300)');
     expect(result.html).toContain('background-color: transparent');
   });
+
+  test('{{asset:alias}} 可解析为图片', async () => {
+    const markerConfig: TemplateConfig = {
+      variables: {},
+      assets: {
+        banner: '/api/assets/company-banner.png',
+      },
+      styles: {
+        p: 'my-4',
+        img: 'w-full h-auto my-4 rounded-lg',
+      },
+    };
+
+    const markdown = '封面如下：\n\n{{asset:banner}}';
+    const result = await convertMarkdownToHTML(markdown, markerConfig);
+
+    expect(result.html).toContain('<img');
+    expect(result.html).toContain('/api/assets/company-banner.png');
+    expect(result.warnings.length).toBe(0);
+  });
 });

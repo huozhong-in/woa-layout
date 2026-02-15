@@ -83,6 +83,9 @@ function insertDefaultTemplate(db: Database) {
     },
   };
 
+  const overseasDividerAliasToken = `@bg(${['divider'].join('')})`;
+  const overseasDividerBgClass = `bg-${`[url(${overseasDividerAliasToken})]`}`;
+
   const overseasUnicornConfig: TemplateConfig = {
     global: {
       themeColor: '#b76e79',
@@ -113,7 +116,7 @@ function insertDefaultTemplate(db: Database) {
       strong: 'font-bold text-gray-900',
       em: 'italic text-gray-700',
       del: 'line-through text-gray-500',
-      hr: 'my-10 border-0 h-px bg-gray-200',
+      hr: `my-[40px] border-0 h-[24px] w-full ${overseasDividerBgClass} bg-no-repeat bg-center bg-[length:100%_100%]`,
       a: 'underline text-[var(--brandColor)]',
       img: 'w-full h-auto my-5 rounded-xl shadow-sm',
       table: 'w-full my-5 border-collapse text-[15px]',

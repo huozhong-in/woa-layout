@@ -26,6 +26,8 @@ export async function convertMarkdownToHTML(
   templateConfig: TemplateConfig
 ): Promise<ConversionResult> {
   try {
+    const markerProcessed = preprocessAssetAliasMarkers(markdown, templateConfig.assets || {});
+
     const processor = unified()
       .use(remarkParse) // Markdown → MDAST
       .use(remarkGfm) // GFM 扩展（表格、删除线等）
@@ -35,10 +37,13 @@ export async function convertMarkdownToHTML(
       .use(rehypeInjectStyles, templateConfig) // 注入内联样式
       .use(rehypeStringify); // HAST → HTML
 
-    const result = await processor.process(markdown);
+    const result = await processor.process(markerProcessed.markdown);
     
     // 从处理结果中提取警告
-    const warnings = (result.data?.warnings as string[]) || [];
+    const warnings = [
+      ...markerProcessed.warnings,
+      ...((result.data?.warnings as string[]) || []),
+    ];
 
     return {
       html: String(result),
@@ -48,6 +53,31 @@ export async function convertMarkdownToHTML(
     console.error('Markdown 转换失败:', error);
     throw new Error(`转换失败: ${error instanceof Error ? error.message : '未知错误'}`);
   }
+}
+
+function preprocessAssetAliasMarkers(
+  markdown: string,
+  assets: Record<string, string>
+): { markdown: string; warnings: string[] } {
+  const warnings: string[] = [];
+  const aliasRegex = /\{\{asset:([a-zA-Z0-9_-]+)\}\}/g;
+
+  const transformed = markdown.replace(aliasRegex, (full, aliasRaw: string) => {
+    const alias = String(aliasRaw || '').trim();
+    const url = assets[alias];
+
+    if (!url) {
+      warnings.push(`素材别名未配置：{{asset:${alias}}}`);
+      return full;
+    }
+
+    return `![${alias}](${url})`;
+  });
+
+  return {
+    markdown: transformed,
+    warnings,
+  };
 }
 
 /**

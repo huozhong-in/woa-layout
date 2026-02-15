@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="24" viewBox="0 0 1200 24" role="img" aria-label="overseas divider v2">
+  <rect x="0" y="11" width="540" height="2" fill="#2f2f2f"/>
+  <rect x="660" y="11" width="540" height="2" fill="#2f2f2f"/>
+  <rect x="594" y="2" width="12" height="20" rx="6" fill="#7973f7" transform="rotate(45 600 12)"/>
+</svg>
