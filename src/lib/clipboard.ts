@@ -3,6 +3,10 @@
 
 // 需要内联的关键 CSS 属性列表
 const IMPORTANT_STYLE_PROPERTIES = [
+  'background-image',
+  'background-size',
+  'background-repeat',
+  'background-position',
   'background-color',
   'color',
   'font-size',
@@ -56,6 +60,23 @@ const IMPORTANT_STYLE_PROPERTIES = [
   'padding-block',     // CSS 逻辑属性（padding-top + padding-bottom）
   'padding-inline',    // CSS 逻辑属性（padding-left + padding-right）
 ];
+
+function toAbsoluteUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return url;
+
+  try {
+    return new URL(trimmed, window.location.href).toString();
+  } catch {
+    return url;
+  }
+}
+
+function extractUrlFromBackgroundImage(backgroundImage: string): string | null {
+  const match = backgroundImage.match(/url\((['"]?)(.*?)\1\)/i);
+  if (!match || !match[2]) return null;
+  return match[2].trim();
+}
 
 /**
  * 将计算后的样式内联到元素
@@ -267,6 +288,11 @@ function processImages(container: HTMLElement): void {
   const images = container.getElementsByTagName('img');
   
   Array.from(images).forEach((image) => {
+    const src = image.getAttribute('src');
+    if (src) {
+      image.setAttribute('src', toAbsoluteUrl(src));
+    }
+
     const width = image.getAttribute('width');
     const height = image.getAttribute('height');
     const alt = image.getAttribute('alt') || '';
@@ -302,6 +328,47 @@ function processImages(container: HTMLElement): void {
     if (!image.style.maxWidth) {
       image.style.maxWidth = '100%';
     }
+  });
+}
+
+function convertStyledHrToImage(container: HTMLElement): void {
+  const hrElements = container.querySelectorAll('hr');
+
+  hrElements.forEach((hr) => {
+    const backgroundImage = hr.style.backgroundImage;
+    const rawUrl = extractUrlFromBackgroundImage(backgroundImage);
+    if (!rawUrl) return;
+
+    const dividerUrl = toAbsoluteUrl(rawUrl);
+    const replacement = document.createElement('div');
+
+    replacement.style.display = 'block';
+    replacement.style.width = hr.style.width || '100%';
+    replacement.style.height = hr.style.height || '1px';
+    replacement.style.margin = hr.style.margin || '';
+    replacement.style.marginTop = hr.style.marginTop || replacement.style.marginTop;
+    replacement.style.marginRight = hr.style.marginRight || replacement.style.marginRight;
+    replacement.style.marginBottom = hr.style.marginBottom || replacement.style.marginBottom;
+    replacement.style.marginLeft = hr.style.marginLeft || replacement.style.marginLeft;
+    replacement.style.padding = '0';
+    replacement.style.border = '0';
+    replacement.style.lineHeight = '0';
+    replacement.style.boxSizing = 'border-box';
+
+    const img = document.createElement('img');
+    img.src = dividerUrl;
+    img.alt = 'divider';
+    img.style.display = 'block';
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.maxWidth = '100%';
+    img.style.objectFit = 'fill';
+    img.style.border = '0';
+    img.style.margin = '0';
+    img.style.padding = '0';
+
+    replacement.appendChild(img);
+    hr.replaceWith(replacement);
   });
 }
 
@@ -724,6 +791,10 @@ export function processClipboardContent(sourceElement: HTMLElement, targetElemen
   
   // 关键步骤3：处理图片尺寸
   processImages(targetElement);
+
+  // 关键步骤3.5：将带背景图的 hr 转为图片块
+  // 微信编辑器对 hr 样式过滤较重，转为 img 能稳定保留自定义分隔线
+  convertStyledHrToImage(targetElement);
   
   // 关键步骤4：处理列表结构
   processListStructure(targetElement);
