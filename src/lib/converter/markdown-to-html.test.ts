@@ -150,6 +150,15 @@ A-->B;
     expect(result.html).toContain('https://www.google.com');
   });
 
+  test('参考链接优先保留有意义标题并使用显式编号', async () => {
+    const markdown = 'https://www.jernesto.com/articles/thinking_hard\n\n[HN原帖](https://www.jernesto.com/articles/thinking_hard)';
+    const result = await convertMarkdownToHTML(markdown, testConfig);
+
+    expect(result.html).toContain('参考链接');
+    expect(result.html).toContain('1. HN原帖：');
+    expect(result.html).toContain('https://www.jernesto.com/articles/thinking_hard');
+  });
+
   test('@bg(alias) 自动替换为素材 URL', async () => {
     const aliasToken = `@bg(${['divider'].join('')})`;
     const bgClass = `bg-${`[url('${aliasToken}')]`}`;

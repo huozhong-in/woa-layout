@@ -10,6 +10,11 @@ interface LinkRef {
   text: string;
 }
 
+function normalizeLinkText(text: string, href: string): string {
+  const cleaned = text.trim().replace(/[：:]+$/g, '').trim();
+  return cleaned || href;
+}
+
 function asArray(value: unknown): string[] {
   if (Array.isArray(value)) return value.map(String);
   if (typeof value === 'string') return [value];
@@ -75,18 +80,16 @@ function createLinkReferencesSection(links: LinkRef[]): Element[] {
     },
     {
       type: 'element',
-      tagName: 'ol',
+      tagName: 'div',
       properties: {},
-      children: links.map((item) => ({
+      children: links.map((item, index) => ({
         type: 'element',
-        tagName: 'li',
+        tagName: 'p',
         properties: {},
         children: [
           {
-            type: 'element',
-            tagName: 'span',
-            properties: {},
-            children: [{ type: 'text', value: `${item.text}：` }],
+            type: 'text',
+            value: `${index + 1}. ${item.text}：`,
           },
           {
             type: 'element',
@@ -112,8 +115,12 @@ export const rehypeWechatEnhancements: Plugin<[], Root> = () => {
       if (node.tagName === 'a') {
         const href = String(node.properties?.href ?? '');
         if (/^https?:\/\//.test(href)) {
-          const text = getText(node) || href;
-          if (!linkMap.has(href)) {
+          const text = normalizeLinkText(getText(node), href);
+          const existing = linkMap.get(href);
+
+          if (!existing) {
+            linkMap.set(href, { href, text });
+          } else if (existing.text === href && text !== href) {
             linkMap.set(href, { href, text });
           }
         }
