@@ -85,6 +85,34 @@ export function StyleConfigurator() {
     showActionErrorToast(showToast, action, payload, fallback);
   const toastNetError = (action: string) => showNetworkErrorToast(showToast, action);
 
+  async function copyText(text: string): Promise<boolean> {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // fallback below
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'true');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      textarea.style.top = '0';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+
   function confirmDiscardIfNeeded(message: string): boolean {
     const { hasUnsavedChanges } = useAppStore.getState();
     if (!hasUnsavedChanges) return true;
@@ -196,10 +224,10 @@ export function StyleConfigurator() {
 
   async function handleCopyAssetUrl(url: string) {
     const absoluteUrl = `${window.location.origin}${url}`;
-    try {
-      await navigator.clipboard.writeText(absoluteUrl);
+    const ok = await copyText(absoluteUrl);
+    if (ok) {
       showToast('素材 URL 已复制', 'success');
-    } catch {
+    } else {
       showToast('复制素材 URL 失败', 'error');
     }
   }
@@ -527,19 +555,19 @@ export function StyleConfigurator() {
       markdown: sampleMarkdown,
     })}'`;
 
-    try {
-      await navigator.clipboard.writeText(curlCommand);
+    const ok = await copyText(curlCommand);
+    if (ok) {
       showToast('curl 命令已复制到剪贴板', 'success');
-    } catch {
+    } else {
       showToast('复制 curl 命令失败', 'error');
     }
   };
 
   const handleCopyApiUrl = async () => {
-    try {
-      await navigator.clipboard.writeText(convertApiUrl);
+    const ok = await copyText(convertApiUrl);
+    if (ok) {
       showToast('API URL 已复制到剪贴板', 'success');
-    } catch {
+    } else {
       showToast('复制 API URL 失败', 'error');
     }
   };
@@ -886,10 +914,10 @@ export function StyleConfigurator() {
                       <span className="text-[11px] text-gray-500 flex-1 truncate">{url}</span>
                       <button
                         onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(`{{asset:${alias}}}`);
+                          const ok = await copyText(`{{asset:${alias}}}`);
+                          if (ok) {
                             showToast('自定义标记已复制', 'success');
-                          } catch {
+                          } else {
                             showToast('复制失败', 'error');
                           }
                         }}

@@ -1,3 +1,4 @@
+# 放到 /lib/systemd/system/
 [Unit]
 Description=WOA-Layout Bun Service
 After=network.target
